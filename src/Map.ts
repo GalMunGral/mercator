@@ -9,10 +9,7 @@ export class MapRenderer {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private location: LonLat = new LonLat(
-      -88.22732760995116,
-      40.110373226386486
-    ),
+    private focus: LonLat = new LonLat(-88.22732760995116, 40.110373226386486),
     private zoomLevel: number = 10
   ) {
     this.ctx = canvas.getContext("2d")!;
@@ -20,7 +17,7 @@ export class MapRenderer {
     this.canvas.onwheel = (e) => {
       const prevZoom = this.zoomLevel;
       this.zoomLevel = Math.min(
-        24,
+        22,
         Math.max(this.minZoomLevel, this.zoomLevel - 0.001 * e.deltaY)
       );
       this.draw(prevZoom);
@@ -43,7 +40,7 @@ export class MapRenderer {
 
     canvas.onmousemove = (e) => {
       if (!this.isMoving) return;
-      this.location = this.location
+      this.focus = this.focus
         .toMercator(this.zoomLevel)
         .translate(this.lastMouseX - e.offsetX, this.lastMouseY - e.offsetY)
         .toLonLat();
@@ -113,7 +110,7 @@ export class MapRenderer {
 
     const Z = Math.ceil(this.zoomLevel);
     const scale = 2 ** (this.zoomLevel - Z);
-    const { x, y } = this.location.toMercator(this.zoomLevel);
+    const { x, y } = this.focus.toMercator(this.zoomLevel);
     const tileSize = 256 * scale;
 
     const centerTileX = Math.floor(x / tileSize);

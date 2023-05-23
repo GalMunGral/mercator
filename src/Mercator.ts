@@ -42,6 +42,15 @@ export class Mercator {
   }
 
   public translate(dx: number, dy: number) {
-    return new Mercator(this.x + dx, this.y + dy, this.zoom);
+    const mapSize = 256 * 2 ** this.zoom;
+    return new Mercator(
+      mod(this.x + dx, mapSize),
+      mod(this.y + dy, mapSize),
+      this.zoom
+    );
   }
+}
+
+function mod(x: number, n: number) {
+  return ((x % n) + n) % n;
 }

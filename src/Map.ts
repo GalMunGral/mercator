@@ -108,7 +108,7 @@ export class MapRenderer {
     // This is necessary in order to achieve a smooth transition
     this.scaleCurrentImage(prevZoomLevel);
 
-    const Z = Math.ceil(this.zoomLevel);
+    const Z = Math.round(this.zoomLevel);
     const scale = 2 ** (this.zoomLevel - Z);
     const { x, y } = this.focus.toMercator(this.zoomLevel);
     const tileSize = 256 * scale;

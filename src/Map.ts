@@ -2,8 +2,10 @@ import { LonLat } from "./Mercator";
 
 export class MapRenderer {
   private ctx: CanvasRenderingContext2D;
-  private lastRender: number = 0;
-  private lastZ: number;
+  private lastRender = 0;
+  private lastMouseX = 0;
+  private lastMouseY = 0;
+  private isMoving = false;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -14,7 +16,6 @@ export class MapRenderer {
     private zoomLevel: number = 10
   ) {
     this.ctx = canvas.getContext("2d")!;
-    this.lastZ = zoomLevel;
 
     this.canvas.onwheel = (e) => {
       const prevZoom = this.zoomLevel;
@@ -29,6 +30,27 @@ export class MapRenderer {
       this.resize();
       this.draw(this.zoomLevel);
     });
+
+    canvas.onmousedown = (e) => {
+      this.lastMouseX = e.offsetX;
+      this.lastMouseY = e.offsetY;
+      this.isMoving = true;
+    };
+
+    canvas.onmouseup = () => {
+      this.isMoving = false;
+    };
+
+    canvas.onmousemove = (e) => {
+      if (!this.isMoving) return;
+      this.location = this.location
+        .toMercator(this.zoomLevel)
+        .translate(this.lastMouseX - e.offsetX, this.lastMouseY - e.offsetY)
+        .toLonLat();
+      this.lastMouseX = e.offsetX;
+      this.lastMouseY = e.offsetY;
+      this.draw(this.zoomLevel);
+    };
 
     this.resize();
     this.draw(this.zoomLevel);

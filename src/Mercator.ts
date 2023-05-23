@@ -28,14 +28,20 @@ export class Mercator {
   public toLonLat(): LonLat {
     if (!this._cache) {
       this._cache = new LonLat(
-        this.x / ((128 / Math.PI) * 2 ** this.zoom) - Math.PI,
-        2 *
+        (this.x / ((128 / Math.PI) * 2 ** this.zoom) - Math.PI) *
+          (180 / Math.PI),
+        (2 *
           Math.atan(
             Math.exp(Math.PI - this.y / ((128 / Math.PI) * 2 ** this.zoom))
           ) -
-          Math.PI / 2
+          Math.PI / 2) *
+          (180 / Math.PI)
       );
     }
     return this._cache;
+  }
+
+  public translate(dx: number, dy: number) {
+    return new Mercator(this.x + dx, this.y + dy, this.zoom);
   }
 }

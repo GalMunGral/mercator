@@ -52,40 +52,20 @@ export class MapRenderer {
     return Math.floor((this.canvas.height - 1) / 2);
   }
 
+  private get width(): number {
+    return this.canvas.width;
+  }
+
+  private get height(): number {
+    return this.canvas.height;
+  }
+
   private get left(): number {
     return this.centerX;
   }
 
-  private get right(): number {
-    return this.canvas.width - 1 - this.centerX;
-  }
-
   private get top(): number {
     return this.centerY;
-  }
-
-  private get bottom(): number {
-    return this.canvas.height - 1 - this.centerY;
-  }
-
-  private drawTile(
-    tile: HTMLImageElement,
-    X: number,
-    Y: number,
-    Z: number,
-    initiatedAt: number
-  ) {
-    if (initiatedAt != this.lastRender) return;
-    const scale = 2 ** (this.zoomLevel - Z);
-    const { x: locationX, y: locationY } = this.location.toMercator(
-      this.zoomLevel
-    );
-    const tileX = (X << 8) * scale;
-    const tileY = (Y << 8) * scale;
-    const dx = Math.floor(this.centerX + tileX - locationX);
-    const dy = Math.floor(this.centerY + tileY - locationY);
-    const size = Math.ceil(256 * scale);
-    this.ctx.drawImage(tile, dx, dy, size, size);
   }
 
   private scaleCurrentImage(prevZoomLevel: number) {
@@ -99,38 +79,6 @@ export class MapRenderer {
     this.ctx.drawImage(this.canvas, dx, dy, dw, dh);
   }
 
-  private repeatImage() {
-    const { x: locationX, y: locationY } = this.location.toMercator(
-      this.zoomLevel
-    );
-    const mapSize = 256 * 2 ** this.zoomLevel;
-    const originX = this.centerX - locationX;
-    const originY = this.centerY - locationY;
-
-    if (Math.floor(originX) > 0) {
-      for (
-        let nextOriginX = originX - mapSize;
-        Math.floor(nextOriginX + mapSize) >= 0;
-        nextOriginX -= mapSize
-      ) {
-        this.ctx.drawImage(
-          this.canvas,
-          Math.floor(originX),
-          Math.floor(originY),
-          Math.ceil(mapSize),
-          Math.ceil(mapSize),
-          Math.floor(nextOriginX),
-          Math.floor(originY),
-          Math.ceil(mapSize),
-          Math.ceil(mapSize)
-        );
-      }
-    }
-
-    if (Math.ceil(originX + mapSize) < this.canvas.width - 1) {
-    }
-  }
-
   private draw(prevZoomLevel: number) {
     const initiatedAt = Date.now();
     if (initiatedAt - this.lastRender < 50) return;
@@ -142,39 +90,45 @@ export class MapRenderer {
     this.scaleCurrentImage(prevZoomLevel);
 
     const Z = Math.ceil(this.zoomLevel);
-    const scale = 2 ** (Z - this.zoomLevel);
-    const { x: scaledX, y: scaledY } = this.location.toMercator(Z);
+    const scale = 2 ** (this.zoomLevel - Z);
+    const { x, y } = this.location.toMercator(this.zoomLevel);
+    const tileSize = 256 * scale;
 
-    const mapSizeAtZ = 256 << Z;
-    const minX = Math.max(0, Math.floor(scaledX - this.left * scale)) >> 8;
-    const maxX =
-      Math.min(mapSizeAtZ - 1, Math.ceil(scaledX + this.right * scale)) >> 8;
+    const centerTileX = Math.floor(x / tileSize);
+    const centerTileY = Math.floor(y / tileSize);
+    const centerTileCanvasX = this.centerX - (x % tileSize);
+    const centerTileCanvasY = this.centerY - (y % tileSize);
 
-    const minY = Math.max(0, Math.floor(scaledY - this.top * scale)) >> 8;
-    const maxY =
-      Math.min(mapSizeAtZ - 1, Math.ceil(scaledY + this.bottom * scale)) >> 8;
+    const startX = centerTileX - Math.ceil(centerTileCanvasX / tileSize);
+    const endX =
+      centerTileX + Math.ceil((this.width - centerTileCanvasX) / tileSize) - 1;
 
-    const promises: Array<Promise<void>> = [];
+    const startY = centerTileY - Math.ceil(centerTileCanvasY / tileSize);
+    const endY =
+      centerTileY + Math.ceil((this.height - centerTileCanvasY) / tileSize) - 1;
 
-    for (let X = minX; X <= maxX; ++X) {
-      for (let Y = minY; Y <= maxY; ++Y) {
+    const size = 1 << Z;
+    const mod = (v: number) => ((v % size) + size) % size;
+
+    for (let X = startX; X <= endX; ++X) {
+      for (let Y = startY; Y <= endY; ++Y) {
+        const dx = centerTileCanvasX + (X - centerTileX) * tileSize;
+        const dy = centerTileCanvasY + (Y - centerTileY) * tileSize;
         const tile = new Image();
-        tile.src = `https://mt3.google.com/vt/lyrs=s,h&x=${X}&y=${Y}&z=${Z}`;
-        let _resolve: () => void;
-        promises.push(
-          new Promise((resolve) => {
-            _resolve = resolve;
-          })
-        );
+        tile.src = `https://mt3.google.com/vt/lyrs=s,h&x=${mod(X)}&y=${mod(
+          Y
+        )}&z=${mod(Z)}`;
         tile.onload = () => {
-          this.drawTile(tile, X, Y, Z, initiatedAt);
-          _resolve();
+          if (initiatedAt != this.lastRender) return;
+          this.ctx.drawImage(
+            tile,
+            Math.floor(dx),
+            Math.floor(dy),
+            Math.ceil(tileSize),
+            Math.ceil(tileSize)
+          );
         };
       }
     }
-
-    Promise.all(promises).then(() => {
-      this.repeatImage();
-    });
   }
 }

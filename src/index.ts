@@ -3,15 +3,15 @@ import { LonLat } from "./Mercator";
 import { Polygon } from "./Shapes";
 
 document.addEventListener("DOMContentLoaded", () => {
-  const canvas = document.createElement("canvas");
-  canvas.style.width = "100vw";
-  canvas.style.height = "100vh";
+  const container = document.createElement("div");
+  container.style.width = "100vw";
+  container.style.height = "100vh";
 
   document.body.style.margin = "0px";
-  document.body.append(canvas);
+  document.body.append(container);
 
   const renderer = new MapRenderer(
-    canvas,
+    container,
     new LonLat(-88.22732760995116, 40.110373226386486),
     12
   );

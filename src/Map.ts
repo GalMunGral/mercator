@@ -1,12 +1,12 @@
 import { LonLat } from "./Mercator";
-import { Polygon, Shape } from "./Shapes";
+import { Polygon } from "./Shapes";
 
 export class MapRenderer {
   private renderId = 0;
   private lastMouseX = 0;
   private lastMouseY = 0;
   private isMoving = false;
-  private shapes: Array<Shape> = [];
+  private shapes: Array<Polygon> = [];
 
   private baseLayer: CanvasRenderingContext2D;
   private shapeLayer: CanvasRenderingContext2D;
@@ -33,14 +33,18 @@ export class MapRenderer {
     containerEl.append(baseCanvas);
     containerEl.append(shapeCanvas);
 
-    containerEl.onwheel = (e) => {
-      const prevZoom = this.zoomLevel;
-      this.zoomLevel = Math.min(
-        22,
-        Math.max(this.minZoomLevel, this.zoomLevel - 0.001 * e.deltaY)
-      );
-      this.draw(prevZoom);
-    };
+    containerEl.addEventListener(
+      "wheel",
+      (e) => {
+        const prevZoom = this.zoomLevel;
+        this.zoomLevel = Math.min(
+          22,
+          Math.max(this.minZoomLevel, this.zoomLevel - 0.001 * e.deltaY)
+        );
+        this.draw(prevZoom);
+      },
+      { passive: true }
+    );
 
     window.addEventListener("resize", () => {
       this.resize();
@@ -66,6 +70,22 @@ export class MapRenderer {
       this.lastMouseX = e.offsetX;
       this.lastMouseY = e.offsetY;
       this.draw();
+    };
+
+    containerEl.onclick = (e) => {
+      if (e.metaKey) {
+        const polygon = this.shapes.length ? this.shapes.pop()! : new Polygon();
+        polygon.vertices.push(
+          this.focus
+            .toMercator(this.zoomLevel)
+            .translate(e.offsetX - this.centerX, e.offsetY - this.centerY)
+            .toLonLat()
+        );
+        this.shapes.push(polygon);
+        this.drawShapes();
+      } else {
+        this.shapes.push(new Polygon());
+      }
     };
 
     this.resize();
@@ -190,11 +210,6 @@ export class MapRenderer {
     this.baseLayer.drawImage(tile, dx, dy, size, size);
   }
 
-  public add(shape: Shape): void {
-    this.shapes.push(shape);
-    this.drawShape(shape);
-  }
-
   private toCanvasPosition(location: LonLat): { x: number; y: number } {
     const loc = location.toMercator(this.zoomLevel);
     const center = this.focus.toMercator(this.zoomLevel);
@@ -210,8 +225,8 @@ export class MapRenderer {
     }
   }
 
-  private drawShape(shape: Shape): void {
-    if (shape instanceof Polygon) {
+  private drawShape(shape: Polygon): void {
+    if (shape.vertices.length) {
       this.shapeLayer.beginPath(); // FIX
 
       const start = shape.vertices[0];
@@ -223,9 +238,12 @@ export class MapRenderer {
         this.shapeLayer.lineTo(x, y);
       });
 
-      this.shapeLayer.fillStyle = "rgba(255, 95, 5, 0.5)";
+      this.shapeLayer.fillStyle = "rgba(255, 95, 5, 0.2)";
+      this.shapeLayer.strokeStyle = "rgba(255, 95, 5, 1)";
+      this.shapeLayer.lineWidth = 2;
       this.shapeLayer.closePath();
       this.shapeLayer.fill();
+      this.shapeLayer.stroke();
     }
   }
 }

@@ -2,7 +2,7 @@ import { LonLat } from "./Mercator";
 import { Polygon, Shape } from "./Shapes";
 
 export class MapRenderer {
-  private lastRender = 0;
+  private renderId = 0;
   private lastMouseX = 0;
   private lastMouseY = 0;
   private isMoving = false;
@@ -119,15 +119,11 @@ export class MapRenderer {
   }
 
   private draw(prevZoomLevel: number = this.zoomLevel) {
-    const initiatedAt = Date.now();
-    if (initiatedAt - this.lastRender < 50) return;
-
-    this.lastRender = initiatedAt;
+    this.renderId++;
 
     // Repaint current image at a new scale while waiting for new tiles to load
     // This is necessary in order to achieve a smooth transition
     this.scaleCurrentImage(prevZoomLevel);
-
     this.drawShapes();
 
     const Z = Math.round(this.zoomLevel);
@@ -162,7 +158,7 @@ export class MapRenderer {
           this.cache.set(key, this.loadTile(mod(X), mod(Y), Z));
         }
         this.cache.get(key)!.then((tile) => {
-          this.drawTile(tile, X, Y, Z, initiatedAt);
+          this.drawTile(tile, X, Y, Z, this.renderId);
         });
       }
     }
@@ -181,9 +177,10 @@ export class MapRenderer {
     X: number,
     Y: number,
     Z: number,
-    initiatedAt: number
-  ) {
-    if (initiatedAt != this.lastRender) return;
+    requestedBy: number
+  ): void {
+    // Cancel this task if a newer render has started.
+    if (this.renderId > requestedBy) return;
     // FIX: scale might have changed, must recompute tileSize!
     const scale = 2 ** (this.zoomLevel - Z);
     const { x, y } = this.focus.toMercator(this.zoomLevel);

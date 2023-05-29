@@ -11,6 +11,8 @@ export class MapRenderer {
   private baseLayer: CanvasRenderingContext2D;
   private shapeLayer: CanvasRenderingContext2D;
 
+  private cache = new Map<string, Promise<HTMLImageElement>>();
+
   constructor(
     private containerEl: HTMLElement,
     private focus: LonLat,
@@ -155,23 +157,40 @@ export class MapRenderer {
 
     for (let X = startX; X <= endX; ++X) {
       for (let Y = startY; Y <= endY; ++Y) {
-        const tile = new Image();
-        tile.src = `https://mt3.google.com/vt/lyrs=s,h&x=${mod(X)}&y=${mod(
-          Y
-        )}&z=${mod(Z)}`;
-
-        tile.onload = () => {
-          if (initiatedAt != this.lastRender) return;
-          // FIX: must recompute tileSize
-          const scale = 2 ** (this.zoomLevel - Z);
-          const { x, y } = this.focus.toMercator(this.zoomLevel);
-          const dx = this.centerX + X * 256 * scale - x;
-          const dy = this.centerY + Y * 256 * scale - y;
-          const size = 256 * scale;
-          this.baseLayer.drawImage(tile, dx, dy, size, size);
-        };
+        const key = `${mod(X)}-${mod(Y)}-${Z}`;
+        if (!this.cache.has(key)) {
+          this.cache.set(key, this.loadTile(mod(X), mod(Y), Z));
+        }
+        this.cache.get(key)!.then((tile) => {
+          this.drawTile(tile, X, Y, Z, initiatedAt);
+        });
       }
     }
+  }
+
+  private loadTile(X: number, Y: number, Z: number): Promise<HTMLImageElement> {
+    const tile = new Image();
+    tile.src = `https://mt3.google.com/vt/lyrs=s,h&x=${X}&y=${Y}&z=${Z}`;
+    tile.onload = () => _resolve(tile);
+    let _resolve: (el: HTMLImageElement) => void;
+    return new Promise((resolve) => (_resolve = resolve));
+  }
+
+  private drawTile(
+    tile: HTMLImageElement,
+    X: number,
+    Y: number,
+    Z: number,
+    initiatedAt: number
+  ) {
+    if (initiatedAt != this.lastRender) return;
+    // FIX: scale might have changed, must recompute tileSize!
+    const scale = 2 ** (this.zoomLevel - Z);
+    const { x, y } = this.focus.toMercator(this.zoomLevel);
+    const dx = this.centerX + X * 256 * scale - x;
+    const dy = this.centerY + Y * 256 * scale - y;
+    const size = 256 * scale;
+    this.baseLayer.drawImage(tile, dx, dy, size, size);
   }
 
   public add(shape: Shape): void {

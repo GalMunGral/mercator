@@ -2,6 +2,8 @@ import { MapRenderer } from "./Map";
 import { LonLat } from "./Mercator";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const queryParams = new URLSearchParams(location.search);
+
   const container = document.createElement("div");
   container.style.width = "100vw";
   container.style.height = "100vh";
@@ -11,7 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const renderer = new MapRenderer(
     container,
-    new LonLat(-88.22732760995116, 40.110373226386486),
-    12
+    new LonLat(
+      Number(queryParams.get("lon")) || 0,
+      Number(queryParams.get("lat")) || 0
+    ),
+    2
   );
 });

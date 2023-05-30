@@ -204,8 +204,8 @@ export class MapRenderer {
     // FIX: scale might have changed, must recompute tileSize!
     const scale = 2 ** (this.zoomLevel - Z);
     const { x, y } = this.focus.toMercator(this.zoomLevel);
-    const dx = this.centerX + X * 256 * scale - x;
-    const dy = this.centerY + Y * 256 * scale - y;
+    const dx = Math.floor(this.centerX + X * 256 * scale - x);
+    const dy = Math.floor(this.centerY + Y * 256 * scale - y);
     const size = 256 * scale;
     this.baseLayer.drawImage(tile, dx, dy, size, size);
   }

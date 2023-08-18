@@ -1,6 +1,9 @@
 import { LonLat } from "./Mercator";
 import { Polygon } from "./Shapes";
 
+const MIN_ZOOM = 0;
+const MAX_ZOOM = 20;
+
 export class MapRenderer {
   private renderId = 0;
   private lastMouseX = 0;
@@ -36,14 +39,24 @@ export class MapRenderer {
     containerEl.addEventListener(
       "wheel",
       (e) => {
+        e.preventDefault();
         const prevZoom = this.zoomLevel;
         this.zoomLevel = Math.min(
-          22,
-          Math.max(this.minZoomLevel, this.zoomLevel - 0.001 * e.deltaY)
+          MAX_ZOOM,
+          Math.max(MIN_ZOOM, this.zoomLevel - 0.001 * e.deltaY)
         );
-        this.draw(prevZoom);
+
+        const scale = 2 ** (this.zoomLevel - prevZoom);
+        const deltaX = (e.clientX - this.width / 2) * (scale - 1);
+        const deltaY = (e.clientY - this.height / 2) * (scale - 1);
+        this.focus = this.focus
+          .toMercator(this.zoomLevel)
+          .translate(deltaX, deltaY)
+          .toLonLat();
+
+        this.draw(prevZoom, -deltaX, -deltaY);
       },
-      { passive: true }
+      { passive: false }
     );
 
     window.addEventListener("resize", () => {
@@ -92,11 +105,6 @@ export class MapRenderer {
     this.draw();
   }
 
-  private get minZoomLevel(): number {
-    return 0;
-    // return Math.log2(Math.min(this.canvas.width, this.canvas.height) / 256);
-  }
-
   private resize() {
     const rect = this.containerEl.getBoundingClientRect();
     this.baseLayer.canvas.width = this.shapeLayer.canvas.width = rect.width;
@@ -127,23 +135,27 @@ export class MapRenderer {
     return this.centerY;
   }
 
-  private scaleCurrentImage(prevZoomLevel: number) {
+  private scaleCurrentImage(
+    prevZoomLevel: number,
+    deltaX: number,
+    deltaY: number
+  ) {
     const scale = 2 ** (this.zoomLevel - prevZoomLevel);
     const sw = this.width;
     const sh = this.height;
-    const dx = this.centerX - this.left * scale;
-    const dy = this.centerY - this.top * scale;
+    const dx = this.centerX - this.left * scale + deltaX;
+    const dy = this.centerY - this.top * scale + deltaY;
     const dw = sw * scale;
     const dh = sh * scale;
     this.baseLayer.drawImage(this.baseLayer.canvas, dx, dy, dw, dh);
   }
 
-  private draw(prevZoomLevel: number = this.zoomLevel) {
+  private draw(prevZoomLevel = this.zoomLevel, deltaX = 0, deltaY = 0) {
     this.renderId++;
 
     // Repaint current image at a new scale while waiting for new tiles to load
     // This is necessary in order to achieve a smooth transition
-    this.scaleCurrentImage(prevZoomLevel);
+    this.scaleCurrentImage(prevZoomLevel, deltaX, deltaY);
     this.drawShapes();
 
     const Z = Math.round(this.zoomLevel);

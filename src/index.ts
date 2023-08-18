@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.style.margin = "0px";
   document.body.append(container);
 
-  const renderer = new MapRenderer(
+  new MapRenderer(
     container,
     new LonLat(
       Number(queryParams.get("lon")) || 0,

@@ -1,5 +1,6 @@
 import { LonLat } from "./Mercator";
 import { Polygon } from "./Shapes";
+import { dist } from "./utils";
 
 const MIN_ZOOM = 0;
 const MAX_ZOOM = 20;
@@ -43,7 +44,7 @@ export class MapRenderer {
         const prevZoom = this.zoomLevel;
         this.zoomLevel = Math.min(
           MAX_ZOOM,
-          Math.max(MIN_ZOOM, this.zoomLevel - 0.001 * e.deltaY)
+          Math.max(MIN_ZOOM, this.zoomLevel - 0.005 * e.deltaY)
         );
 
         const scale = 2 ** (this.zoomLevel - prevZoom);
@@ -100,6 +101,66 @@ export class MapRenderer {
         this.shapes.push(new Polygon());
       }
     };
+
+    const touchCache: Record<number, Touch> = {};
+
+    containerEl.addEventListener("touchstart", (e) => {
+      for (let touch of e.touches) {
+        touchCache[touch.identifier] = touch;
+      }
+    });
+
+    containerEl.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      switch (e.targetTouches.length) {
+        case 1: {
+          if (e.changedTouches.length) {
+            const touch = e.changedTouches[0];
+            const prevTouch = touchCache[e.changedTouches[0].identifier];
+
+            this.focus = this.focus
+              .toMercator(this.zoomLevel)
+              .translate(
+                prevTouch.clientX - touch.clientX,
+                prevTouch.clientY - touch.clientY
+              )
+              .toLonLat();
+            this.draw();
+          }
+          break;
+        }
+        case 2: {
+          const touch1 = e.targetTouches[0];
+          const touch2 = e.targetTouches[1];
+          const curDist = dist(e.targetTouches[0], e.targetTouches[1]);
+          const prevDist = dist(
+            touchCache[touch1.identifier],
+            touchCache[touch2.identifier]
+          );
+          const prevZoom = this.zoomLevel;
+          this.zoomLevel = Math.min(
+            MAX_ZOOM,
+            Math.max(MIN_ZOOM, this.zoomLevel + 0.005 * (curDist - prevDist))
+          );
+          const scale = 2 ** (this.zoomLevel - prevZoom);
+          const deltaX =
+            ((touch1.clientX + touch2.clientX) / 2 - this.width / 2) *
+            (scale - 1);
+          const deltaY =
+            ((touch1.clientY + touch2.clientY) / 2 - this.height / 2) *
+            (scale - 1);
+          this.focus = this.focus
+            .toMercator(this.zoomLevel)
+            .translate(deltaX, deltaY)
+            .toLonLat();
+          this.draw(prevZoom, -deltaX, -deltaY);
+          break;
+        }
+      }
+      for (const touch of e.touches) {
+        touchCache[touch.identifier] = touch;
+      }
+    });
 
     this.resize();
     this.draw();
